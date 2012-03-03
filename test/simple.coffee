@@ -4,62 +4,86 @@ Stash  = require '../src/Stash'
 describe 'When no dependencies exist', ->
 	stash = new Stash()
 	
+	comment1 = {author: 'jack', text: 'foo'}
+	comment2 = {author: 'jill', text: 'bar'}
+	
 	beforeEach ->
-		stash.set 1, {id: 1, text: 'foo'}
-		stash.set 2, {id: 2, text: 'bar'}
+		stash.set 'comment:1', comment1
+		stash.set 'comment:2', comment2
 
 	afterEach ->
-		stash.redis.del 1, 2
+		stash.redis.del 'comment:1', 'comment:2'
 	
 	it 'should delete only the invalidated entry', (done) ->
-		stash.inv 1, (err, invalid) ->
-			expect(invalid).to.be.eql [1]
+		stash.inv 'comment:1', (err, invalid) ->
+			expect(invalid).to.be.eql ['comment:1']
 			done()
 
 describe 'When a single dependency exists', ->
 	stash = new Stash()
+
+	comment1 = {author: 'jack', text: 'foo'}
+	comment2 = {author: 'jill', text: 'bar'}
+	post1    = {author: 'joe', text: 'blah', comments: [comment1, comment2]}
 	
 	beforeEach ->
-		obj1 = {id: 1, text: 'foo'}
-		obj2 = {id: 2, text: 'bar'}
-		arrA = [obj1, obj2]
-		
-		stash.set 1,   obj1
-		stash.set 2,   obj2
-		stash.set 'A', arrA
-		stash.dep 'A', [1, 2]
+		stash.set 'comment:1', comment1
+		stash.set 'comment:2', comment2
+		stash.set 'post:1',    post1
+		stash.dep 'post:1',    ['comment:1', 'comment:2']
 	
 	afterEach ->
-		stash.redis.del 1, 2, 'A', stash._depkey(1), stash._depkey(2)
+		keys = [
+			'comment:1'
+			'comment:2'
+			'post:1'
+			stash._depkey('comment:1')
+			stash._depkey('comment:2')
+		]
+		stash.redis.del keys
 	
 	it 'should invalidate the dependency', (done) ->
-		stash.inv 1, (err, invalid) ->
-			expect(invalid).to.be.eql [1, 'A']
+		stash.inv 'comment:1', (err, invalid) ->
+			expect(invalid).to.be.eql ['comment:1', 'post:1']
 			done()
 
 describe 'When two levels of dependencies exist', ->
 	stash = new Stash()
 	
+	comment1 = {author: 'jack', text: 'foo'}
+	comment2 = {author: 'jill', text: 'bar'}
+	comment3 = {author: 'bob',  text: 'bloo'}
+	post1    = {author: 'joe', text: 'blah', comments: [comment1, comment2]}
+	post2    = {author: 'joe', text: 'derp', comments: [comment3]}
+	page1    = [post1, post2]
+	
 	beforeEach ->
-		obj1 = {id: 1, text: 'foo'}
-		obj2 = {id: 2, text: 'bar'}
-		arrA = [obj1, obj2]
-		arrB = [obj2]
-		arrC = [arrA, arrB]
-		
-		stash.set 1,   obj1
-		stash.set 2,   obj2
-		stash.set 'A', arrA
-		stash.dep 'A', [1, 2]
-		stash.set 'B', arrB
-		stash.dep 'B', 2
-		stash.set 'C', arrC
-		stash.dep 'C', ['A', 'B']
+		stash.set 'comment:1', comment1
+		stash.set 'comment:2', comment2
+		stash.set 'post:1',    post1
+		stash.dep 'post:1',    ['comment:1', 'comment:2']
+		stash.set 'post:2',    post2
+		stash.dep 'post:2',    'comment:3'
+		stash.set 'page:1',    page1
+		stash.dep 'page:1',    ['post:1', 'post:2']
 	
 	afterEach ->
-		stash.redis.del 1, 2, 'A', 'B', 'C', stash._depkey(1), stash._depkey(2), stash._depkey('A'), stash._depkey('B')
+		keys = [
+			'comment:1'
+			'comment:2'
+			'comment:3'
+			'post:1'
+			'post:2'
+			'page:1'
+			stash._depkey('comment:1')
+			stash._depkey('comment:2')
+			stash._depkey('comment:3')
+			stash._depkey('post:1')
+			stash._depkey('post:2')
+		]
+		stash.redis.del keys
 	
 	it 'should invalidate all dependencies', (done) ->
-		stash.inv 1, (err, invalid) ->
-			expect(invalid).to.be.eql [1, 'A', 'C']
+		stash.inv 'comment:1', (err, invalid) ->
+			expect(invalid).to.be.eql ['comment:1', 'post:1', 'page:1']
 			done()

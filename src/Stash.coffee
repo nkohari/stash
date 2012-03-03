@@ -23,24 +23,24 @@ class Stash
 		@redis.set key, @_pack(value), callback
 	
 	dep: (child, parents, callback = noop) ->
-		add = (parent, next) =>
-			@redis.sadd @_depkey(parent), child, next
-		async.map arrayify(parents), add, callback
+		add = (parent, next) => @redis.sadd @_depkey(parent), child, next
+		if _.isArray(parents)
+			async.map parents, add, callback
+		else
+			add(parents, callback)
 	
-	# TODO: This is currently O(N) since it executes one SMEMBERS for each dependency
-	# resolution. If instead we used SUNION to resolve multiple dependency pointers
-	# at once, we could make it O(log N).
 	inv: (key, callback = noop) ->
-		invalid  = [key]
-		queue    = [@_depkey(key)]
-		moreleft = -> queue.length > 0
-		collect  = (next) =>
-			key = queue.pop()
-			return next() unless key?
-			@redis.smembers key, (err, deps) =>
+		invalid   = [key]
+		processed = []
+		queue     = [@_depkey(key)]
+		moreleft  = -> queue.length > 0
+		collect   = (next) =>
+			@redis.sunion queue, (err, deps) =>
+				processed = _.union processed, queue
 				unless err?
 					invalid = _.union invalid, deps
-					queue   = _.union queue,   _.map deps, @_depkey
+					nextgen = _.map deps, @_depkey
+					queue   = _.difference nextgen, processed
 				next()
 		async.whilst moreleft, collect, (err) =>
 			@redis.del invalid, (err) ->
