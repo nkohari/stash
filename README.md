@@ -81,15 +81,15 @@ All callbacks use the standard Node convention of `(err, data)`.
 
 Gets the value stored at the specified key.
 
-## stash.set(key, value, callback)
+## stash.set(key, value, [callback])
 
-Sets the value stored at the specified key.
+Sets the value stored at the specified key. If `callback` is specified, it will be called after the item is set.
 
 ## stash.dep(key, dependencies..., [callback])
 
 Declares that the value stored at `key` depends on values stored at the keys specified in `dependencies`.
 The `dependencies` may be either an array, or varargs, or a combination of both. If `callback` is specified,
-it will be called once the dependencies are created.
+it will be called after the dependencies are created.
 
 ## stash.inv(keys..., [callback])
 
@@ -101,7 +101,8 @@ be called with an array of keys that were removed from the cache.
 
 Removes the entries stored at each key in `keys` from the cache. This differs from `inv()` in that it does not
 remove dependent items, and also destroys the entries' dependency graph. Use this when the object that's cached
-no longer exists, and won't need to react to updates.
+no longer exists, and won't need to react to updates. If `callback` is specified, it will be called after the
+items are removed.
 
 # License (Apache 2.0)
 
