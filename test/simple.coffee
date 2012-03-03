@@ -12,7 +12,7 @@ describe 'When no dependencies exist', ->
 		stash.set 'comment:2', comment2
 
 	afterEach ->
-		stash.redis.del 'comment:1', 'comment:2'
+		stash.rem 'comment:1', 'comment:2'
 	
 	it 'should delete only the invalidated entry', (done) ->
 		stash.inv 'comment:1', (err, invalid) ->
@@ -33,18 +33,31 @@ describe 'When a single dependency exists', ->
 		stash.dep 'post:1',    ['comment:1', 'comment:2']
 	
 	afterEach ->
-		keys = [
-			'comment:1'
-			'comment:2'
-			'post:1'
-			stash._depkey('comment:1')
-			stash._depkey('comment:2')
-		]
-		stash.redis.del keys
+		stash.rem 'comment:1', 'comment:2', 'post:1'
 	
 	it 'should invalidate the dependency', (done) ->
 		stash.inv 'comment:1', (err, invalid) ->
 			expect(invalid).to.be.eql ['comment:1', 'post:1']
+			done()
+
+describe 'When a circular dependency exists', ->
+	stash = new Stash()
+
+	obj1 = {text: 'foo'}
+	obj2 = {text: 'bar'}
+	
+	beforeEach ->
+		stash.set 'obj:1', obj1
+		stash.dep 'obj:1', 'obj:2'
+		stash.set 'obj:2', obj2
+		stash.dep 'obj:2', 'obj:1'
+	
+	afterEach ->
+		stash.rem 'obj:1', 'obj:2'
+	
+	it 'should invalidate both keys without imploding the universe', (done) ->
+		stash.inv 'obj:1', (err, invalid) ->
+			expect(invalid).to.be.eql ['obj:1', 'obj:2']
 			done()
 
 describe 'When two levels of dependencies exist', ->
@@ -68,20 +81,14 @@ describe 'When two levels of dependencies exist', ->
 		stash.dep 'page:1',    ['post:1', 'post:2']
 	
 	afterEach ->
-		keys = [
+		stash.rem [
 			'comment:1'
 			'comment:2'
 			'comment:3'
 			'post:1'
 			'post:2'
 			'page:1'
-			stash._depkey('comment:1')
-			stash._depkey('comment:2')
-			stash._depkey('comment:3')
-			stash._depkey('post:1')
-			stash._depkey('post:2')
 		]
-		stash.redis.del keys
 	
 	it 'should invalidate all dependencies', (done) ->
 		stash.inv 'comment:1', (err, invalid) ->

@@ -2,52 +2,66 @@ async  = require 'async'
 redis  = require 'redis'
 _      = require 'underscore'
 
-noop     = ->
-arrayify = (what) -> if _.isArray(what) then what else [what]
+noop = () ->
 
-defaults =
+DEFAULTS =
 	host:   'localhost'
 	port:   6379
-	prefix: 'stash'
 
 class Stash
 	
 	constructor: (config) ->
-		@config = _.extend defaults, config
+		@config = _.extend DEFAULTS, config
 		@redis  = redis.createClient @config.port, @config.host
 	
 	get: (key, callback) ->
-		@redis.get key, callback
+		@redis.get @_nodekey(key), callback
 	
 	set: (key, value, callback = noop) ->
-		@redis.set key, @_pack(value), callback
+		@redis.set @_nodekey(key), @_pack(value), callback
 	
-	dep: (child, parents, callback = noop) ->
-		add = (parent, next) => @redis.sadd @_depkey(parent), child, next
-		if _.isArray(parents)
-			async.map parents, add, callback
-		else
-			add(parents, callback)
+	dep: (args...) ->
+		callback = if _.isFunction _.last args then args.pop() else noop
+		child    = @_nodekey args.shift()
+		parents  = _.map _.flatten(args), @_edgekey
+		makeEdge = (parent, next) => @redis.sadd parent, child, next
+		async.map parents, makeEdge, callback
 	
-	inv: (key, callback = noop) ->
-		invalid   = [key]
-		processed = []
-		queue     = [@_depkey(key)]
-		moreleft  = -> queue.length > 0
+	inv: (args...) ->
+		callback = if _.isFunction _.last args then args.pop() else noop
+		@_graph _.flatten(args), (err, graph) =>
+			@redis.del graph.nodes, (err) =>
+				if err? then callback(err, null)
+				else callback null, graph.nodes
+	
+	rem: (args...) ->
+		callback = if _.isFunction _.last args then args.pop() else noop
+		keys     = _.flatten args
+		allkeys  = _.union _.map(keys, @_nodekey), _.map(keys, @_edgekey)
+		@redis.del allkeys, (err) =>
+			if err? then callback(err, null)
+			else callback null, allkeys
+	
+	_graph: (keys, callback) ->
+		nodes     = _.map keys, @_nodekey
+		remaining = _.map keys, @_edgekey
+		edges     = []
+		moreleft  = -> remaining.length > 0
 		collect   = (next) =>
-			@redis.sunion queue, (err, deps) =>
-				processed = _.union processed, queue
+			@redis.sunion remaining, (err, deps) =>
+				edges = _.union edges, remaining
 				unless err?
-					invalid = _.union invalid, deps
-					nextgen = _.map deps, @_depkey
-					queue   = _.difference nextgen, processed
+					nodes     = _.union nodes, deps
+					nextgen   = _.map deps, @_edgekey
+					remaining = _.difference nextgen, edges
 				next()
-		async.whilst moreleft, collect, (err) =>
-			@redis.del invalid, (err) ->
-				callback(null, invalid)
+		async.whilst moreleft, collect, (err) ->
+			if err? then return callback(err, null)
+			callback null, {nodes, edges}
 	
-	_depkey: (key)  -> "#{key}:deps"
-	_pack:   (obj)  -> if _.isString(obj) then obj else JSON.stringify(obj)
-	_unpack: (data) -> JSON.parse(data)
+	_nodekey:  (key)  => key
+	_edgekey:  (key)  => "#{key}:deps"
+	_pack:     (obj)  -> if _.isString(obj) then obj else JSON.stringify(obj)
+	_unpack:   (data) -> JSON.parse(data)
 	
 module.exports = Stash
