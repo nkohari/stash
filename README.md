@@ -102,3 +102,19 @@ be called with an array of keys that were removed from the cache.
 Removes the entries stored at each key in `keys` from the cache. This differs from `inv()` in that it does not
 remove dependent items, and also destroys the entries' dependency graph. Use this when the object that's cached
 no longer exists, and won't need to react to updates.
+
+# License (Apache 2.0)
+
+Copyright (c) 2012 Nate Kohari.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
