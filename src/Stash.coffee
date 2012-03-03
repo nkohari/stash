@@ -5,8 +5,8 @@ _      = require 'underscore'
 noop = () ->
 
 DEFAULTS =
-	host:   'localhost'
-	port:   6379
+	host: 'localhost'
+	port: 6379
 
 class Stash
 	
@@ -59,8 +59,8 @@ class Stash
 			if err? then return callback(err, null)
 			callback null, {nodes, edges}
 	
-	_nodekey:  (key)  => key
-	_edgekey:  (key)  => "#{key}:deps"
+	_nodekey:  (key)  -> key
+	_edgekey:  (key)  -> "#{key}:deps"
 	_pack:     (obj)  -> if _.isString(obj) then obj else JSON.stringify(obj)
 	_unpack:   (data) -> JSON.parse(data)
 	
