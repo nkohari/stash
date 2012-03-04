@@ -1,1 +1,237 @@
-working
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Stash, a graph-based cache for Node.js and Redis</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+	<style type="text/css">
+	@import url(style.css);
+	</style>
+</head>
+<body>
+	<h1>Stash</h1>
+	
+	<p>
+		Stash is a graph-based cache for <a href="http://nodejs.org/" rel="external">Node.js</a>
+		powered by <a href="http://redis.io/" rel="external">Redis</a>.
+	</p>
+	
+	<p class="warning">
+		Warning! Stash is just a mental exercise at this point. Feedback is very much appreciated, but using it
+		in production may cause you to contract ebola or result in global thermonuclear war.
+	</p>
+	
+	<h2>Overview</h2>
+	
+	<blockquote>
+		<p>&ldquo;There are only two hard things in computer science: cache invalidation and naming things.&rdquo;</p>
+		<footer>&mdash; Phil Karlton</footer>
+	</blockquote>
+	
+	<p>
+		One of the most difficult parts about caching is managing dependencies between cache entries. In order to reap
+		the benefits of caching, you typically have to denormalize the data that's stored in the cache. Since data from
+		child items is then stored within parent items, it can be challenging to figure out what entries to invalidate
+		in the cache in response to changes in data.
+	</p>
+	
+	<p>
+		Here's a concrete example. Consider the following data model, powering a blog:
+	</p>
+	
+	<div class="box diagram">
+		<img src="images/data-model.png"/>
+	</div>
+	
+	<p>
+		A <strong>Page</strong> can have zero or more <strong>Posts</strong>, each of which can have zero or more
+		<strong>Comments</strong>. In order to quickly retrieve the contents of a <strong>Post</strong>, you'll
+		want to <a href="http://en.wikipedia.org/wiki/Denormalization" rel="external">denormalize</a> its data
+		and cache it. This means that when you store a <strong>Post</strong>, it will contain all of its
+		<strong>Comments</strong> &mdash; and when you store a <strong>Page</strong>, it will contain all of
+		its <strong>Posts</strong>.
+	</p>
+	
+	<p>
+		Here's some sample data representing a couple of <strong>Posts</strong>, each with <strong>Comments</strong>,
+		rolled up into a <strong>Page</strong>.
+	</p>
+	
+<pre class="box"><code>comment1 = { id: "comment1", author: "John Doe", text: "What an interesting post!" };
+comment2 = { id: "comment2", author: "Jane Doe", text: "I know, right? I should become a writer." };
+post1 = {
+  id: "post1",
+  author: "Jane Doe",
+  text: "Here's a post. It's fascinating."
+  comments: [comment1, comment2]
+};
+comment3 = { id: "comment3", author: "John Doe", text: "Yeah, this post is boring. Don't quit your day job." };
+post2 = {
+  id: "post2",
+  author: "Jane Doe",
+  text: "Here's another post, which is not nearly as fascinating.",
+  comments: [comment3]
+};
+page1 = {
+  id: "page1",
+  posts: [post1, post2]
+};
+</pre></code>
+	
+	<p>
+		To cache this information, we can serialize it to a format like
+		<a href="http://en.wikipedia.org/wiki/JSON" rel="external">JSON</a>. This is what <code>page1</code> would
+		look like after being serialized:
+	</p>
+	
+<pre class="box"><code>{
+  "id": "page1",
+  "posts": [
+    "id": "post1",
+    "author": "Jane Doe",
+    "text": "Here's a post. It's fascinating.",
+    "comments": [{
+      "id": "comment1",
+      "author": "John Doe",
+      "text": "What an interesting post!"
+    },{
+      "id": "comment2",
+      "author": "Jane Doe",
+      "text": "I know, right? I should become a writer."
+    }]
+  },{
+    "id": "post2",
+    "author": "Jane Doe",
+    "text": "Here's another post, which is not nearly as fascinating.",
+    "comments": [{
+      "id": "comment3",
+      "author": "John Doe",
+      "text": "Yeah, this post is boring. Don't quit your day job."
+    }]
+  }]
+}</code></pre>
+
+	<p>
+		This denormalization means that you'll be able to retrieve all of the data necessary to display the <strong>Post</strong>
+		with a single lookup.
+	</p>
+	<p>
+		Unfortunately, it also means that if someone edits one of the <strong>Comments</strong>, the data stored for the
+		<strong>Post</strong> becomes stale. Likewise, when someone edits one of the <strong>Posts</strong>, the data stored
+		for the <strong>Page</strong> becomes stale. In order to ensure that you are serving correct data, your application
+		must remove the stale data from the cache.
+	</p>
+	
+	<p>
+		Stash helps to solve this problem by representing your cache entries as a
+		<a href="http://en.wikipedia.org/wiki/Directed_graph" rel="external">directed graph</a> of dependencies. If you
+		consider the relationship of dependencies in our example, it looks like this:
+	</p>
+	
+	<div class="box diagram">
+		<img src="images/invalidation-1.png"/>
+	</div>
+	
+	<p>
+		Let's say John comes along and edits his first comment. This means that the data stored at this position is no
+		longer valid, and should be removed from the cache:
+	</p>
+	
+	<div class="box diagram">
+		<img src="images/invalidation-2.png"/>
+	</div>
+	
+	<p>
+		That's not too hard, but since we decided to denormalize the data for <code>comment1</code> into <code>post1</code>
+		and <code>page1</code>, we have to remove those items from the cache as well. When you invalidate an entry,
+		Stash will walk the dependency graph and remove any dependent entries from the cache as well. In this case,
+		Stash would remove the following subtree from the graph, leaving the rest alone:
+	</p>
+	
+	<div class="box diagram">
+		<img src="images/invalidation-3.png"/>
+	</div>
+	
+	<p>
+		Even when an item is invalidated, Stash remembers the dependencies between them, so you only need to alter the
+		dependency graph when the relationships between your items change, not when the data changes.
+	</p>
+	
+	<h2>API</h2>
+
+	<p>
+		All callbacks use the standard Node.js convention of <code>(err, data)</code>.
+	</p>
+
+	<div class="api">
+		<code>new Stash( config )</code>
+	</div>
+	<p class="api">
+		Creates a new instance of <code>Stash</code> and connects to Redis. Configuration options may include:
+		<ul>
+			<li><code>host</code> &mdash; the hostname or IP address of the Redis server to connect to</li>
+			<li><code>port</code> &mdash; the port name of the Redis server to connect to</li>
+		</ul>
+	</p>
+
+	<div class="api">
+		<code>get( key, callback )</code>
+	</div>
+	<p class="api">
+		Gets the item stored at the specified key.
+	</p>
+
+	<div class="api">
+		<code>set( key, value, [callback] )</code>
+	</div>
+	<p class="api">
+		Sets the value stored at the specified key. If a <code>callback</code> is specified, it will be called after
+		the item is set.
+	</p>
+	
+	<div class="api">
+		<code>dep( key, dependencies..., [callback] )</code>
+	</div>
+	<p class="api">
+		Declares that the value stored at <code>key</code> depends on values stored at the keys specified in
+		<code>dependencies</code>. The dependencies may be either an array, or varargs, or a combination of both.
+		If a <code>callback</code> is specified, it will be called after the dependencies are created.
+	</p>
+	
+	<div class="api">
+		<code>inv( keys..., [callback] )</code>
+	</div>
+	<p class="api">
+		Declares that the value stored at each key in <code>keys</code> is no longer valid and should be removed
+		from the cache. The keys may be either an array, or varargs, or a combination of both. If a <code>callback</code>
+		is specified, it will be called with an array of keys that were removed from the cache.
+	</p>
+	
+	<div class="api">
+		<code>rem( keys..., [callback] )</code>
+	</div>
+	<p class="api">
+		Removes the entries stored at each key in <code>keys</code> from the cache. This differs from <code>inv()</code>
+		in that it does not remove dependent items, and destroys the edges of the graph related to the items. Use this
+		when an item no longer exists, and won't be added to the cache again. If a <code>callback</code> is specified,
+		it will be called after the items are removed.
+	</p>
+	
+	<div class="api">
+		<code>quit( [force] )</code>
+	</div>
+	<p class="api">
+		Disconnects from Redis. If you want to disconnect immediately and terminate in-flight requests, pass
+		<code>true</code> for <code>force</code>.
+	</p>
+	
+	<footer>
+		Copyright &copy; 2012 <a href="mailto:nkohari@gmail.com">Nate Kohari</a> under the
+		<a href="http://www.apache.org/licenses/LICENSE-2.0.html">Apache 2.0 license</a>.
+	</footer>
+	
+	<a href="https://github.com/nkohari/stash"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://a248.e.akamai.net/assets.github.com/img/7afbc8b248c68eb468279e8c17986ad46549fb71/687474703a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6461726b626c75655f3132313632312e706e67" alt="Fork me on GitHub"></a>
+	
+	<script src="hijs/hijs.js"></script>
+	
+</body>
+</html>

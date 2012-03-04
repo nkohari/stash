@@ -1,0 +1,83 @@
+/* Based on Square's Cube GitHub pages. Kudos. */
+
+body {
+	font-family: "Helvetica Neue";
+	width: 960px;
+	margin: auto;
+	text-rendering: optimizeLegibility;
+}
+
+body > footer {
+	font-size: 0.9em;
+	margin-top: 2.4em;
+	padding: 1.2em 0;
+	border-top: 1px solid #999;
+}
+
+p.warning {
+	padding: 0.4em;
+	background: #ffbaba;
+	border: 1px solid #a99;
+}
+
+h2 {
+	border-bottom: 1px solid #999;
+}
+
+blockquote {
+	margin: 1.2em;
+}
+
+blockquote p {
+	font-style: italic;
+	margin: 0;
+}
+
+blockquote > footer {
+	margin-top: 0.4em;
+	font-size: 0.9em;
+}
+
+a, a:visited {
+	color: #00c;
+}
+
+a:hover, a:active {
+	color: #000;
+}
+
+p {
+	line-height: 1.4em;
+}
+
+code {
+	font-family: "Monaco", monospace;
+	font-size: 0.85em;
+}
+
+code .number { color: #900; }
+code .string { color: #006; }
+
+div.api {
+	margin-top: 1.4em;
+}
+
+div.api code {
+	font-size: 1.1em;
+}
+
+p.api {
+	margin-top: 0.2em;
+}
+
+.box {
+	background-color: #efefef;
+	border: 1px solid #aaa;
+	padding: 10px;
+	margin: 1.2em 0;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.diagram {
+	text-align: center;
+}
