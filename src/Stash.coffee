@@ -14,10 +14,14 @@ class Stash
 		@config = _.extend DEFAULTS, config
 		@redis  = redis.createClient @config.port, @config.host
 	
+	quit: (force = false) ->
+		if force then @redis.end()
+		else @redis.quit()
+	
 	get: (key, callback) ->
 		@redis.get @_nodekey(key), (err, data) =>
 			if err? then callback(err)
-			else callback null, @_unpack(value)
+			else callback null, @_unpack(data)
 	
 	set: (key, value, callback = noop) ->
 		@redis.set @_nodekey(key), @_pack(value), callback
