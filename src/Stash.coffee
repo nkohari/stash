@@ -15,17 +15,26 @@ class Stash
 		@redis  = redis.createClient @config.port, @config.host
 	
 	get: (key, callback) ->
-		@redis.get @_nodekey(key), callback
+		@redis.get @_nodekey(key), (err, data) =>
+			if err? then callback(err)
+			else callback null, @_unpack(value)
 	
 	set: (key, value, callback = noop) ->
 		@redis.set @_nodekey(key), @_pack(value), callback
 	
 	dep: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
-		child    = @_nodekey args.shift()
-		parents  = _.map _.flatten(args), @_edgekey
-		makeEdge = (parent, next) => @redis.sadd parent, child, next
-		async.map parents, makeEdge, callback
+		child    = args.shift()
+		parents  = _.flatten(args)
+		# NOTE: This could be improved to set multiple values for SADD, but that requires
+		# Redis 2.4, and the in-memory computation probably isn't faster than parallelizing.
+		addKeys = (parent, next) =>
+			funcs = [
+				(done) => @redis.sadd @_outkey(parent), @_nodekey(child), done
+				(done) => @redis.sadd @_inkey(child), @_nodekey(parent), done
+			]
+			async.parallel funcs, next
+		async.map parents, addKeys, callback
 	
 	inv: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
@@ -37,30 +46,33 @@ class Stash
 	rem: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
 		keys     = _.flatten args
-		allkeys  = _.union _.map(keys, @_nodekey), _.map(keys, @_edgekey)
+		allkeys  = _.union _.map(keys, @_nodekey), _.map(keys, @_inkey), _.map(keys, @_outkey)
 		@redis.del allkeys, (err) =>
 			if err? then callback(err, null)
 			else callback null, allkeys
 	
 	_graph: (keys, callback) ->
-		nodes     = _.map keys, @_nodekey
-		remaining = _.map keys, @_edgekey
-		edges     = []
+		graph =
+			nodes: _.map keys, @_nodekey
+			edges: []
+			depth: 0
+		remaining = _.map keys, @_outkey
 		moreleft  = -> remaining.length > 0
 		collect   = (next) =>
 			@redis.sunion remaining, (err, deps) =>
-				edges = _.union edges, remaining
+				graph.edges = _.union graph.edges, remaining
+				graph.depth++
 				unless err?
-					nodes     = _.union nodes, deps
-					nextgen   = _.map deps, @_edgekey
-					remaining = _.difference nextgen, edges
+					graph.nodes = _.union graph.nodes, deps
+					remaining   = _.difference _.map(deps, @_outkey), graph.edges
 				next()
 		async.whilst moreleft, collect, (err) ->
-			if err? then return callback(err, null)
-			callback null, {nodes, edges}
+			if err? then return callback(err)
+			callback(null, graph)
 	
 	_nodekey:  (key)  -> key
-	_edgekey:  (key)  -> "#{key}:deps"
+	_inkey:    (key)  -> "#{key}:in"
+	_outkey:   (key)  -> "#{key}:out"
 	_pack:     (obj)  -> if _.isString(obj) then obj else JSON.stringify(obj)
 	_unpack:   (data) -> JSON.parse(data)
 	
