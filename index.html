@@ -191,12 +191,34 @@ page1 = {
 	</p>
 	
 	<div class="api">
-		<code>dep( key, dependencies..., [callback] )</code>
+		<code>dadd( key, dependencies..., [callback] )</code>
 	</div>
 	<p class="api">
 		Declares that the value stored at <code>key</code> depends on values stored at the keys specified in
 		<code>dependencies</code>. The dependencies may be either an array, or varargs, or a combination of both.
 		If a <code>callback</code> is specified, it will be called after the dependencies are created.
+	</p>
+	
+	<div class="api">
+		<code>drem( key, [dependencies...], [callback] )</code>
+	</div>
+	<p class="api">
+		Removes dependency links between the value stored at <code>key</code> and the values stored at the keys
+		specified in <code>dependencies</code>. The dependencies may be either an array, varargs, or a combination
+		of both. You may also omit <code>dependencies</code> in which case all dependencies will be removed.
+		If a <code>callback</code> is specified, it will be called with an array of keys that were previously dependencies.
+	</p>
+	
+	<div class="api">
+		<code>dget( key, callback )</code>
+	</div>
+	<p class="api">
+		Gets the dependency links for the value stored at <code>key</code>. The <code>callback</code> will be called
+		with a hash, with these properties:
+		<ul>
+			<li><code>in</code> keys of items that are dependent upon the item at <code>key</code>
+			<li><code>out</code> keys of items that the item at <code>key</code> depends upon
+		</ul>
 	</p>
 	
 	<div class="api">
