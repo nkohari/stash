@@ -26,26 +26,14 @@ class Stash
 	set: (key, value, callback = noop) ->
 		@redis.set @_nodekey(key), @_pack(value), callback
 	
-	dep: (args...) ->
-		callback = if _.isFunction _.last args then args.pop() else noop
-		child    = args.shift()
-		parents  = _.flatten(args)
-		# NOTE: This could be improved to set multiple values for SADD, but that requires
-		# Redis 2.4, and the in-memory computation probably isn't faster than parallelizing.
-		addEdges = (parent, next) =>
-			async.parallel [
-				(done) => @redis.sadd @_outkey(parent), @_nodekey(child), done
-				(done) => @redis.sadd @_inkey(child), @_nodekey(parent), done
-			], next
-		async.forEach parents, addEdges, callback
-	
 	inv: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
-		@_graph _.flatten(args), (err, graph) =>
+		@_walk _.flatten(args), (err, graph) =>
 			@redis.del graph.nodes, (err) =>
 				if err? then callback(err, null)
 				else callback null, graph.nodes
 	
+	# TODO: rem() should call drem() to destroy the dependency graph more cleanly
 	rem: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
 		keys     = _.flatten args
@@ -54,7 +42,55 @@ class Stash
 			if err? then callback(err, null)
 			else callback null, allkeys
 	
-	_graph: (keys, callback) ->
+	dget: (key, callback) ->
+		funcs =
+			in:  (done) => @redis.smembers @_inkey(key),  done
+			out: (done) => @redis.smembers @_outkey(key), done
+		async.parallel funcs, callback
+	
+	dadd: (args...) ->
+		callback = if _.isFunction _.last args then args.pop() else noop
+		child    = args.shift()
+		parents  = _.flatten(args)
+		
+		# NOTE: This could be improved to set multiple values for SADD, but that requires
+		# Redis 2.4, and the in-memory computation probably isn't faster than parallelizing.
+		addEdges = (parent, next) =>
+			async.parallel [
+				(done) => @redis.sadd @_outkey(parent), @_nodekey(child), done
+				(done) => @redis.sadd @_inkey(child), @_nodekey(parent), done
+			], next
+			
+		async.forEach parents, addEdges, callback
+	
+	drem: (args...) ->
+		callback = if _.isFunction _.last args then args.pop() else noop
+		child    = args.shift()
+		if args.length > 0
+			# Remove a subset of parent nodes
+			parents = _.flatten(args)
+			removeEdges = (parent, next) =>
+				async.parallel [
+					(done) => @redis.srem @_outkey(parent), @_nodekey(child), done
+					(done) => @redis.srem @_inkey(child), @_nodekey(parent), done
+				], next
+			async.forEach parents, removeEdges, (err) =>
+				if err? then callback(err)
+				else callback(null, parents)
+		else
+			# Remove all parent nodes
+			@dget child, (err, deps) =>
+				if err? then callback(err)
+				parents = deps.in
+				removeEdge = (parent, next) =>
+					@redis.srem @_outkey(parent), @_nodekey(child), next
+				async.forEach parents, removeEdge, (err) =>
+					if err? then callback(err)
+					@redis.del @_inkey(child), (err) =>
+						if err? then callback(err)
+						else callback(null, parents)
+	
+	_walk: (keys, callback) ->
 		graph =
 			nodes: _.map keys, @_nodekey
 			edges: []
