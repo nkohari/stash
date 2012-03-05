@@ -29,9 +29,10 @@
 	
 	<p>
 		One of the most difficult parts about caching is managing dependencies between cache entries. In order to reap
-		the benefits of caching, you typically have to denormalize the data that's stored in the cache. Since data from
-		child items is then stored within parent items, it can be challenging to figure out what entries to invalidate
-		in the cache in response to changes in data.
+		the benefits of caching, you typically have to
+		<a href="http://en.wikipedia.org/wiki/Denormalization" rel="external">denormalize</a> the data that's stored
+		in the cache. Since data from child items is then stored within parent items, it can be challenging to figure
+		out what entries to invalidate in the cache in response to changes in data.
 	</p>
 	
 	<p>
@@ -45,10 +46,11 @@
 	<p>
 		A <strong>Page</strong> can have zero or more <strong>Posts</strong>, each of which can have zero or more
 		<strong>Comments</strong>. In order to quickly retrieve the contents of a <strong>Post</strong>, you'll
-		want to <a href="http://en.wikipedia.org/wiki/Denormalization" rel="external">denormalize</a> its data
-		and cache it. This means that when you store a <strong>Post</strong>, it will contain all of its
-		<strong>Comments</strong> &mdash; and when you store a <strong>Page</strong>, it will contain all of
-		its <strong>Posts</strong>.
+		want to denormalize its data and cache it. This means that when you store a <strong>Post</strong>, it will
+		contain all of its <strong>Comments</strong> &mdash; and when you store a <strong>Page</strong>, it will
+		contain all of its <strong>Posts</strong>. Not just the IDs, but the actual data &mdash; otherwise you'd
+		have to do multiple cache lookups to reconstitute the parent objects, and the point of the cache is to
+		speed up the loading process.
 	</p>
 	
 	<p>
