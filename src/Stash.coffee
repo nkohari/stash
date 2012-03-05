@@ -32,13 +32,12 @@ class Stash
 		parents  = _.flatten(args)
 		# NOTE: This could be improved to set multiple values for SADD, but that requires
 		# Redis 2.4, and the in-memory computation probably isn't faster than parallelizing.
-		addKeys = (parent, next) =>
-			funcs = [
+		addEdges = (parent, next) =>
+			async.parallel [
 				(done) => @redis.sadd @_outkey(parent), @_nodekey(child), done
 				(done) => @redis.sadd @_inkey(child), @_nodekey(parent), done
-			]
-			async.parallel funcs, next
-		async.map parents, addKeys, callback
+			], next
+		async.forEach parents, addEdges, callback
 	
 	inv: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
