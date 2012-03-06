@@ -195,7 +195,7 @@ page1 = {
 	</div>
 	<p class="api">
 		Declares that the value stored at <code>key</code> depends on values stored at the keys specified in
-		<code>dependencies</code>. The dependencies may be either an array, or varargs, or a combination of both.
+		<code>dependencies</code>. The dependencies may be either an array, varargs, or a combination of both.
 		If a <code>callback</code> is specified, it will be called after the dependencies are created.
 	</p>
 	
@@ -225,8 +225,9 @@ page1 = {
 		<code>dset( key, dependencies..., [callback] )</code>
 	</div>
 	<p class="api">
-		Sets the dependency links for the value stored at <code>key</code>, replacing any links that previously existed.
-		The <code>callback</code> will be called with a hash, with these properties:
+		Sets the dependency links for the value stored at <code>key</code> to the keys specified in <code>dependencies</code>,
+		replacing any links that previously existed. The dependencies may be either an array, varargs, or a combination
+		of both. The <code>callback</code> will be called with a hash, with these properties:
 		<ul>
 			<li><code>added</code> keys of dependencies that were added
 			<li><code>removed</code> keys of dependencies that were removed
@@ -238,7 +239,7 @@ page1 = {
 	</div>
 	<p class="api">
 		Declares that the value stored at each key in <code>keys</code> is no longer valid and should be removed
-		from the cache. The keys may be either an array, or varargs, or a combination of both. If a <code>callback</code>
+		from the cache. The keys may be either an array, varargs, or a combination of both. If a <code>callback</code>
 		is specified, it will be called with an array of keys that were removed from the cache.
 	</p>
 	
@@ -246,10 +247,11 @@ page1 = {
 		<code>rem( keys..., [callback] )</code>
 	</div>
 	<p class="api">
-		Removes the entries stored at each key in <code>keys</code> from the cache. This differs from <code>inv()</code>
-		in that it does not remove dependent items, and destroys the edges of the graph related to the items. Use this
-		when an item no longer exists, and won't be added to the cache again. If a <code>callback</code> is specified,
-		it will be called after the items are removed.
+		Removes the entries stored at each key in <code>keys</code> from the cache. The keys may be either an array,
+		varargs, or a combination of both. This differs from <code>inv()</code> in that it does not remove dependent
+		items, and destroys the edges of the graph related to the items. Use this when an item no longer exists,
+		and won't be added to the cache again. If a <code>callback</code> is specified, it will be called after
+		the items are removed.
 	</p>
 	
 	<div class="api">
