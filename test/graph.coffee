@@ -73,6 +73,14 @@ describe 'Given a scenario with one dependency', ->
 				next()
 		async.parallel tests, done
 	
+	describe 'When dset() is called', ->
+		it 'should replace the dependency links', (done) ->
+			stash.dset 'post1', ['comment1'], (err, result) ->
+				expect(err).to.not.exist
+				expect(result.added).to.be.empty
+				expect(result.removed).to.eql ['comment2']
+				done()
+	
 	describe 'When drem() is called with no arguments', ->
 		it 'should remove all dependency links', (done) ->
 			stash.drem 'post1', (err, removed) ->

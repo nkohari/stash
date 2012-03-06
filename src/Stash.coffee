@@ -30,7 +30,7 @@ class Stash
 		callback = if _.isFunction _.last args then args.pop() else noop
 		@_walk _.flatten(args), (err, graph) =>
 			@redis.del graph.nodes, (err) =>
-				if err? then callback(err, null)
+				if err? then callback(err)
 				else callback null, graph.nodes
 	
 	# TODO: rem() should call drem() to destroy the dependency graph more cleanly
@@ -39,7 +39,7 @@ class Stash
 		keys     = _.flatten args
 		allkeys  = _.union _.map(keys, @_nodekey), _.map(keys, @_inkey), _.map(keys, @_outkey)
 		@redis.del allkeys, (err) =>
-			if err? then callback(err, null)
+			if err? then callback(err)
 			else callback null, allkeys
 	
 	dget: (key, callback) ->
@@ -47,6 +47,17 @@ class Stash
 			in:  (done) => @redis.smembers @_inkey(key),  done
 			out: (done) => @redis.smembers @_outkey(key), done
 		async.parallel funcs, callback
+	
+	dset: (args...) ->
+		callback = if _.isFunction _.last args then args.pop() else noop
+		child    = args.shift()
+		parents  = _.flatten(args)
+		@dget child, (err, deps) =>
+			if err? then return callback(err)
+			async.parallel {
+				added:   (next) => @dadd child, _.difference(parents, deps.in), next
+				removed: (next) => @drem child, _.difference(deps.in, parents), next
+			}, callback
 	
 	dadd: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
@@ -61,7 +72,9 @@ class Stash
 				(done) => @redis.sadd @_inkey(child), @_nodekey(parent), done
 			], next
 			
-		async.forEach parents, addEdges, callback
+		async.forEach parents, addEdges, (err) =>
+			if err? then return callback(err)
+			callback(null, parents)
 	
 	drem: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
@@ -75,8 +88,8 @@ class Stash
 					(done) => @redis.srem @_inkey(child), @_nodekey(parent), done
 				], next
 			async.forEach parents, removeEdges, (err) =>
-				if err? then callback(err)
-				else callback(null, parents)
+				if err? then return callback(err)
+				callback(null, parents)
 		else
 			# Remove all parent nodes
 			@dget child, (err, deps) =>
@@ -85,10 +98,10 @@ class Stash
 				removeEdge = (parent, next) =>
 					@redis.srem @_outkey(parent), @_nodekey(child), next
 				async.forEach parents, removeEdge, (err) =>
-					if err? then callback(err)
+					if err? then return callback(err)
 					@redis.del @_inkey(child), (err) =>
-						if err? then callback(err)
-						else callback(null, parents)
+						if err? then return callback(err)
+						callback(null, parents)
 	
 	_walk: (keys, callback) ->
 		graph =
