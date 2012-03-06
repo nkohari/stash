@@ -222,6 +222,18 @@ page1 = {
 	</p>
 	
 	<div class="api">
+		<code>dset( key, dependencies..., [callback] )</code>
+	</div>
+	<p class="api">
+		Sets the dependency links for the value stored at <code>key</code>, replacing any links that previously existed.
+		The <code>callback</code> will be called with a hash, with these properties:
+		<ul>
+			<li><code>added</code> keys of dependencies that were added
+			<li><code>removed</code> keys of dependencies that were removed
+		</ul>
+	</p>
+	
+	<div class="api">
 		<code>inv( keys..., [callback] )</code>
 	</div>
 	<p class="api">
