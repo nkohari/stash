@@ -33,14 +33,16 @@ class Stash
 				if err? then callback(err)
 				else callback null, graph.nodes
 	
-	# TODO: rem() should call drem() to destroy the dependency graph more cleanly
 	rem: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
-		keys     = _.flatten args
-		allkeys  = _.union _.map(keys, @_nodekey), _.map(keys, @_inkey), _.map(keys, @_outkey)
-		@redis.del allkeys, (err) =>
-			if err? then callback(err)
-			else callback null, allkeys
+		keys = _.flatten args
+		@inv keys, (err) =>
+			if err? then return callback(err)
+			async.forEach keys, _.bind(@drem, this), (err) =>
+				if err? then return callback(err)
+				@redis.del keys, (err) =>
+					if err? then return callback(err)
+					callback null, keys
 	
 	dget: (key, callback) ->
 		funcs =
@@ -55,23 +57,19 @@ class Stash
 		@dget child, (err, deps) =>
 			if err? then return callback(err)
 			async.parallel {
-				added:   (next) => @dadd child, _.difference(parents, deps.in), next
-				removed: (next) => @drem child, _.difference(deps.in, parents), next
+				added:   (done) => @dadd child, _.difference(parents, deps.in), done
+				removed: (done) => @drem child, _.difference(deps.in, parents), done
 			}, callback
 	
 	dadd: (args...) ->
 		callback = if _.isFunction _.last args then args.pop() else noop
 		child    = args.shift()
 		parents  = _.flatten(args)
-		
-		# NOTE: This could be improved to set multiple values for SADD, but that requires
-		# Redis 2.4, and the in-memory computation probably isn't faster than parallelizing.
 		addEdges = (parent, next) =>
 			async.parallel [
 				(done) => @redis.sadd @_outkey(parent), @_nodekey(child), done
 				(done) => @redis.sadd @_inkey(child), @_nodekey(parent), done
 			], next
-			
 		async.forEach parents, addEdges, (err) =>
 			if err? then return callback(err)
 			callback(null, parents)
