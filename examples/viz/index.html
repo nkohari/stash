@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+	<title>Stash</title>
+</head>
+<body>
+	<canvas id="graph" width="800" height="600"></canvas>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+	<script src="arbor.js"></script>
+	<script src="arbor-graphics.js"></script>
+	<script src="viz.js"></script>
+	<script>
+	$(function() {
+		viz = new StashVisualizer('#graph');
+		viz.graph({
+			nodes: {
+				'comment1': {},
+				'comment2': {},
+				'comment3': {},
+				'post1': {},
+				'post2': {},
+				'page1': {}
+			},
+			edges: {
+				'comment1': { 'post1': {} },
+				'comment2': { 'post1': {} },
+				'comment3': { 'post2': {} },
+				'post1': { 'page1': {} },
+				'post2': { 'page1': {} }
+			}
+		});
+	});
+	</script>
+</body>
+</html>

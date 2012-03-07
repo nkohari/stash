@@ -9,6 +9,9 @@ exec = (executable, args, callback) ->
 task 'build', 'Build lib/ from src/', ->
 	exec './node_modules/coffee-script/bin/coffee', ['-c', '-o', 'lib', 'src']
 
+task 'build-examples', 'Build examples', ->
+	exec './node_modules/coffee-script/bin/coffee', ['-c', '-o', 'examples/viz', 'examples/viz']
+
 task 'test', 'Run tests', ->
 	exec './node_modules/mocha/bin/mocha', ['--colors', '-R', 'spec']
 	
