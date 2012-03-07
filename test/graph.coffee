@@ -4,6 +4,7 @@ Stash  = require '../src/Stash'
 
 describe 'Given a scenario with no dependencies', ->
 	stash = new Stash()
+	allkeys = ['comment1', 'comment2']
 	
 	comment1 = {author: 'jack', text: 'foo'}
 	comment2 = {author: 'jill', text: 'bar'}
@@ -15,8 +16,7 @@ describe 'Given a scenario with no dependencies', ->
 		], ready
 
 	afterEach (ready) ->
-		keys = ['comment1', 'comment2']
-		stash.rem keys, ready
+		stash.rem allkeys, ready
 	
 	after ->
 		stash.quit()
@@ -37,6 +37,7 @@ describe 'Given a scenario with no dependencies', ->
 
 describe 'Given a scenario with one dependency', ->
 	stash = new Stash()
+	allkeys = ['comment1', 'comment2', 'post1']
 
 	comment1 = {author: 'jack', text: 'foo'}
 	comment2 = {author: 'jill', text: 'bar'}
@@ -51,27 +52,19 @@ describe 'Given a scenario with one dependency', ->
 		], ready
 	
 	afterEach (ready) ->
-		keys = ['comment1', 'comment2', 'post1']
-		stash.rem keys, ready
+		stash.rem allkeys, ready
 	
 	after ->
 		stash.quit()
 	
 	it 'should correctly add dependency links', (done) ->
-		tests = []
-		tests.push (next) ->
-			stash.dget 'comment1', (err, deps) ->
-				expect(err).to.not.exist
-				expect(deps.in).to.be.empty
-				expect(deps.out).to.be.eql ['post1']
-				next()
-		tests.push (next) ->
-			stash.dget 'post1', (err, deps) ->
-				expect(err).to.not.exist
-				expect(deps.in).to.be.eql ['comment1', 'comment2']
-				expect(deps.out).to.be.eql []
-				next()
-		async.parallel tests, done
+		stash.dget ['comment1', 'post1'], (err, deps) ->
+			expect(err).to.not.exist
+			expect(deps['comment1'].in).to.be.empty
+			expect(deps['comment1'].out).to.be.eql ['post1']
+			expect(deps['post1'].in).to.be.eql ['comment1', 'comment2']
+			expect(deps['post1'].out).to.be.eql []
+			done()
 	
 	describe 'When dset() is called', ->
 		it 'should replace the dependency links', (done) ->
@@ -107,6 +100,7 @@ describe 'Given a scenario with one dependency', ->
 
 describe 'Given a scenario with a circular dependency', ->
 	stash = new Stash()
+	allkeys = ['obj1', 'obj2']
 
 	obj1 = {text: 'foo'}
 	obj2 = {text: 'bar'}
@@ -120,27 +114,19 @@ describe 'Given a scenario with a circular dependency', ->
 		], ready
 	
 	afterEach (ready) ->
-		keys = ['obj1', 'obj2']
-		stash.rem keys, ready
+		stash.rem allkeys, ready
 	
 	after ->
 		stash.quit()
 	
 	it 'should create dependency links', (done) ->
-		tests = []
-		tests.push (next) ->
-			stash.dget 'obj1', (err, deps) ->
-				expect(err).to.not.exist
-				expect(deps.in).to.be.eql ['obj2']
-				expect(deps.out).to.be.eql ['obj2']
-				next()
-		tests.push (next) ->
-			stash.dget 'obj2', (err, deps) ->
-				expect(err).to.not.exist
-				expect(deps.in).to.be.eql ['obj1']
-				expect(deps.out).to.be.eql ['obj1']
-				next()
-		async.parallel tests, done
+		stash.dget ['obj1', 'obj2'], (err, deps) ->
+			expect(err).to.not.exist
+			expect(deps['obj1'].in).to.eql ['obj2']
+			expect(deps['obj1'].out).to.eql ['obj2']
+			expect(deps['obj2'].in).to.eql ['obj1']
+			expect(deps['obj2'].out).to.eql ['obj1']
+			done()
 
 	describe 'When drem() is called', ->
 		it 'should remove one side of the dependency links', (done) ->
@@ -161,6 +147,7 @@ describe 'Given a scenario with a circular dependency', ->
 
 describe 'Given a scenario with two levels of dependencies', ->
 	stash = new Stash()
+	allkeys = ['comment1', 'comment2', 'comment3', 'post1', 'post2', 'page1']
 	
 	comment1 = {author: 'jack', text: 'foo'}
 	comment2 = {author: 'jill', text: 'bar'}
@@ -171,8 +158,9 @@ describe 'Given a scenario with two levels of dependencies', ->
 	
 	beforeEach (ready) ->
 		async.parallel [
-			(done) -> stash.set 'comment1', comment1, done
+			(done) -> stash.set  'comment1', comment1, done
 			(done) -> stash.set  'comment2', comment2, done
+			(done) -> stash.set  'comment3', comment3, done
 			(done) -> stash.set  'post1', post1, done
 			(done) -> stash.dadd 'post1', ['comment1', 'comment2'], done
 			(done) -> stash.set  'post2', post2, done
@@ -182,33 +170,27 @@ describe 'Given a scenario with two levels of dependencies', ->
 		], ready
 
 	afterEach (ready) ->
-		keys = ['comment1', 'comment2', 'comment3', 'post1', 'post2', 'page1']
-		stash.rem keys, ready
+		stash.rem allkeys, ready
 	
 	after ->
 		stash.quit()
 	
 	it 'should create dependency links', (done) ->
-		tests = []
-		tests.push (next) ->
-			stash.dget 'comment1', (err, deps) ->
-				expect(err).to.not.exist
-				expect(deps.in).to.be.empty
-				expect(deps.out).to.be.eql ['post1']
-				next()
-		tests.push (next) ->
-			stash.dget 'post1', (err, deps) ->
-				expect(err).to.not.exist
-				expect(deps.in).to.be.eql ['comment1', 'comment2']
-				expect(deps.out).to.be.eql ['page1']
-				next()
-		tests.push (next) ->
-			stash.dget 'page1', (err, deps) ->
-				expect(err).to.not.exist
-				expect(deps.in).to.be.eql ['post1', 'post2']
-				expect(deps.out).to.be.empty
-				next()
-		async.parallel tests, done
+		stash.dget allkeys, (err, deps) ->
+			expect(err).to.not.exist
+			expect(deps['comment1'].in).to.empty
+			expect(deps['comment1'].out).to.eql ['post1']
+			expect(deps['comment2'].in).to.empty
+			expect(deps['comment2'].out).to.eql ['post1']
+			expect(deps['comment3'].in).to.empty
+			expect(deps['comment3'].out).to.eql ['post2']
+			expect(deps['post1'].in).to.eql ['comment1', 'comment2']
+			expect(deps['post1'].out).to.eql ['page1']
+			expect(deps['post2'].in).to.eql ['comment3']
+			expect(deps['post2'].out).to.eql ['page1']
+			expect(deps['page1'].in).to.eql ['post1', 'post2']
+			expect(deps['page1'].out).to.be.empty
+			done()
 		
 	describe 'When drem() is called at the first level of items', ->
 		it 'should remove the first level of dependency links without affecting the second level', (done) ->
@@ -225,18 +207,11 @@ describe 'Given a scenario with two levels of dependencies', ->
 			stash.drem 'page1', (err, removed) ->
 				expect(err).to.not.exist
 				expect(removed).to.eql ['post1', 'post2']
-				funcs = []
-				funcs.push (next) ->
-					stash.dget 'post1', (err, deps) ->
-						expect(err).to.not.exist
-						expect(deps.in).to.eql ['comment1', 'comment2']
-						next()
-				funcs.push (next) ->
-					stash.dget 'post2', (err, deps) ->
-						expect(err).to.not.exist
-						expect(deps.in).to.eql ['comment3']
-						next()
-				async.parallel funcs, done
+				stash.dget ['post1', 'post2'], (err, deps) ->
+					expect(err).to.not.exist
+					expect(deps['post1'].in).to.eql ['comment1', 'comment2']
+					expect(deps['post2'].in).to.eql ['comment3']
+					done()
 
 	describe 'When inv() is called', ->
 		it 'should invalidate all dependencies when child is invalidated', (done) ->
