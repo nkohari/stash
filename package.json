@@ -15,6 +15,10 @@
 		"mocha": "0.14.0"
 	},
 	"engine": "node >= 0.6.x",
+	"scripts": {
+		"test": "./node_modules/mocha/bin/mocha -R spec",
+		"build": "./node_modules/coffee-script/bin/coffee -c src -o lib"
+	},
 	"licenses": [{
 		"type": "Apache 2.0",
 		"url":  "http://www.apache.org/licenses/LICENSE-2.0"
