@@ -172,6 +172,11 @@ page1 = {
 	<h2>API</h2>
 
 	<p>
+		The Stash API is designed to feel similar to Redis commands. Many functions support operations on multiple keys
+		at once; if you use them in this way, Stash does its best to parallelize the calls to Redis for efficiency.
+	</p>
+	
+	<p>
 		All callbacks use the standard Node.js convention of <code>(err, data)</code>.
 	</p>
 
@@ -221,15 +226,22 @@ page1 = {
 	</p>
 	
 	<div class="api">
-		<code>dget( key, callback )</code>
+		<code>dget( keys..., callback )</code>
 	</div>
 	<p class="api">
-		Gets the dependency links for the value stored at <code>key</code>. The <code>callback</code> will be called
-		with a hash, with these properties:
+		Gets the dependency links for the values stored at <code>keys</code>. If one key is specified, the
+		<code>callback</code> will be called with a hash, with these properties:
 		<ul>
 			<li><code>in</code> &mdash; keys of items that are dependent upon the item at <code>key</code>
 			<li><code>out</code> &mdash; keys of items that the item at <code>key</code> depends upon
 		</ul>
+		If you call <code>dget</code> with multiple keys, the <code>callback</code> will be called with a structure
+		like this:
+		<pre class='box'><code>{
+  key1: { in: [...], out: [...] },
+  key2: { in: [...], out: [...] },
+  ...
+}</code></pre>
 	</p>
 	
 	<div class="api">
